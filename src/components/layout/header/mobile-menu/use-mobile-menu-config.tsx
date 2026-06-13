@@ -9,18 +9,12 @@ import useThemeSwitcher from '@/hooks/useThemeSwitcher';
 import useTMB from '@/hooks/useTMB';
 import RootStore from '@/stores/root-store';
 import {
-    LegacyAccountLimitsIcon,
     LegacyCashierIcon,
-    LegacyChartsIcon,
-    LegacyHelpCentreIcon,
-    LegacyHomeOldIcon,
     LegacyProfileSmIcon,
     LegacyReportsIcon,
-    LegacyResponsibleTradingIcon,
     LegacyTheme1pxIcon,
     LegacyWhatsappIcon,
 } from '@deriv/quill-icons/Legacy';
-import { BrandDerivLogoCoralIcon } from '@deriv/quill-icons/Logo';
 import { useTranslations } from '@deriv-com/translations';
 import { ToggleSwitch } from '@deriv-com/ui';
 import { URLConstants } from '@deriv-com/utils';
@@ -103,25 +97,6 @@ const useMobileMenuConfig = (client?: RootStore['client']) => {
             [
                 {
                     as: 'a',
-                    href: standalone_routes.deriv_com,
-                    label: localize('Deriv.com'),
-                    LeftComponent: BrandDerivLogoCoralIcon,
-                },
-                {
-                    as: 'a',
-                    href: standalone_routes.deriv_app,
-                    label: localize("Trader's Hub"),
-                    LeftComponent: LegacyHomeOldIcon,
-                },
-                {
-                    as: 'a',
-                    href: standalone_routes.bot,
-                    label: localize('Trade'),
-                    LeftComponent: LegacyChartsIcon,
-                    isActive: true, // Always highlight Trade as active
-                },
-                {
-                    as: 'a',
                     href: getRedirectUrl(),
                     label: localize('Account Settings'),
                     LeftComponent: LegacyProfileSmIcon,
@@ -148,24 +123,6 @@ const useMobileMenuConfig = (client?: RootStore['client']) => {
                 },
             ].filter(Boolean) as TMenuConfig,
             [
-                {
-                    as: 'a',
-                    href: standalone_routes.help_center,
-                    label: localize('Help center'),
-                    LeftComponent: LegacyHelpCentreIcon,
-                },
-                {
-                    as: 'a',
-                    href: standalone_routes.account_limits,
-                    label: localize('Account limits'),
-                    LeftComponent: LegacyAccountLimitsIcon,
-                },
-                {
-                    as: 'a',
-                    href: standalone_routes.responsible,
-                    label: localize('Responsible trading'),
-                    LeftComponent: LegacyResponsibleTradingIcon,
-                },
                 cs_chat_whatsapp
                     ? {
                           as: 'a',
