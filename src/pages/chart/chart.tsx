@@ -30,12 +30,42 @@ type TError = null | {
 
 const subscriptions: TSubscription = {};
 
+// Default symbol shown before the workspace/active_symbols resolve
+const DEFAULT_SYMBOL = '1HZ10V'; // Volatility 10 (1s) Index
+
+/**
+ * Returns a ready chart_api instance (readyState OPEN).
+ * Waits up to `timeout` ms for the WebSocket to connect.
+ * Falls back to returning the api even if still connecting so
+ * DerivAPIBasic can queue the request internally.
+ */
+const waitForChartApi = (timeout = 10000): Promise<NonNullable<typeof chart_api.api>> => {
+    return new Promise((resolve, reject) => {
+        const start = Date.now();
+
+        const check = async () => {
+            if (!chart_api.api) {
+                await chart_api.init();
+            }
+            if (chart_api.api?.connection?.readyState === WebSocket.OPEN) {
+                return resolve(chart_api.api);
+            }
+            if (Date.now() - start > timeout) {
+                // Return api anyway — DerivAPIBasic queues sends until the socket opens
+                return chart_api.api ? resolve(chart_api.api) : reject(new Error('Chart API timeout'));
+            }
+            setTimeout(check, 100);
+        };
+
+        check();
+    });
+};
+
 const Chart = observer(({ show_digits_stats }: { show_digits_stats: boolean }) => {
     const barriers: [] = [];
     const { common, ui } = useStore();
     const { chart_store, run_panel, dashboard } = useStore();
     const [isSafari, setIsSafari] = useState(false);
-    // FIX 1: reactive connection state — poll until chart_api.api WebSocket is truly OPEN
     const [is_connection_opened, setIsConnectionOpened] = useState(false);
 
     const {
@@ -65,7 +95,6 @@ const Chart = observer(({ show_digits_stats }: { show_digits_stats: boolean }) =
     };
 
     useEffect(() => {
-        // Safari browser detection
         const isSafariBrowser = () => {
             const ua = navigator.userAgent.toLowerCase();
             return ua.indexOf('safari') !== -1 && ua.indexOf('chrome') === -1 && ua.indexOf('android') === -1;
@@ -77,28 +106,26 @@ const Chart = observer(({ show_digits_stats }: { show_digits_stats: boolean }) =
         };
     }, []);
 
-    // FIX 1: Wait for chart_api.api WebSocket to be OPEN before enabling SmartChart
+    // Track connection state for SmartChart's isConnectionOpened prop (used for reconnections)
     useEffect(() => {
         let cancelled = false;
 
-        const tryConnect = async () => {
-            if (!chart_api.api) {
-                await chart_api.init();
+        const poll = () => {
+            if (cancelled) return;
+            if (chart_api.api?.connection?.readyState === WebSocket.OPEN) {
+                setIsConnectionOpened(true);
+            } else {
+                setTimeout(poll, 200);
             }
-
-            const check = () => {
-                if (cancelled) return;
-                const state = chart_api.api?.connection?.readyState;
-                if (state === WebSocket.OPEN) {
-                    setIsConnectionOpened(true);
-                } else {
-                    setTimeout(check, 100);
-                }
-            };
-            check();
         };
 
-        tryConnect();
+        // Ensure chart_api is initialised, then start polling
+        if (!chart_api.api) {
+            chart_api.init().then(poll);
+        } else {
+            poll();
+        }
+
         return () => { cancelled = true; };
     }, []);
 
@@ -106,10 +133,10 @@ const Chart = observer(({ show_digits_stats }: { show_digits_stats: boolean }) =
         chartSubscriptionIdRef.current = chart_subscription_id;
     }, [chart_subscription_id]);
 
+    // Keep retrying updateSymbol until the workspace or active_symbols provide one
     useEffect(() => {
+        updateSymbol();
         if (!symbol) {
-            updateSymbol();
-            // Retry until active_symbols load and a symbol becomes available
             const retry = setInterval(() => {
                 updateSymbol();
             }, 500);
@@ -118,11 +145,13 @@ const Chart = observer(({ show_digits_stats }: { show_digits_stats: boolean }) =
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [symbol]);
 
-    const requestAPI = (req: ServerTimeRequest | ActiveSymbolsRequest | TradingTimesRequest) => {
-        return chart_api.api.send(req);
+    // requestAPI waits for the connection internally — SmartChart shows its own loading
+    // UI while we wait, so the user always sees something rather than a blank screen.
+    const requestAPI = async (req: ServerTimeRequest | ActiveSymbolsRequest | TradingTimesRequest) => {
+        const api = await waitForChartApi();
+        return api.send(req);
     };
 
-    // FIX 2: pass the real requestForgetStream to SmartChart (original passed empty fn)
     const requestForgetStream = (subscription_id: string) => {
         if (subscription_id) chart_api.api?.forget(subscription_id);
     };
@@ -131,14 +160,16 @@ const Chart = observer(({ show_digits_stats }: { show_digits_stats: boolean }) =
         try {
             requestForgetStream(chartSubscriptionIdRef.current);
 
-            // FIX 3: clear any stale server-side tick subscriptions to avoid AlreadySubscribed error
-            try { await chart_api.api.send({ forget_all: 'ticks' }); } catch { /* non-fatal */ }
+            const api = await waitForChartApi();
 
-            const history = await chart_api.api.send(req);
+            // Clear stale server-side tick subscriptions to avoid AlreadySubscribed errors
+            try { await api.send({ forget_all: 'ticks' }); } catch { /* non-fatal */ }
+
+            const history = await api.send(req);
             setChartSubscriptionId(history?.subscription.id);
             if (history) callback(history);
             if (req.subscribe === 1) {
-                subscriptions[history?.subscription.id] = chart_api.api
+                subscriptions[history?.subscription.id] = api
                     .onMessage()
                     ?.subscribe(({ data }: { data: TicksHistoryResponse }) => {
                         callback(data);
@@ -146,16 +177,14 @@ const Chart = observer(({ show_digits_stats }: { show_digits_stats: boolean }) =
             }
         } catch (e) {
             // eslint-disable-next-line no-console
-            (e as TError)?.error?.code === 'MarketIsClosed' && callback([]); // if market is closed send empty array to resolve
+            (e as TError)?.error?.code === 'MarketIsClosed' && callback([]);
             console.log((e as TError)?.error?.message);
         }
     };
 
-    // Don't mount SmartChart until the connection is truly open.
-    // SmartChart calls requestAPI({active_symbols}) immediately on mount, so
-    // chart_api.api must be OPEN before we let it render — otherwise the
-    // request fails silently and _onConnectionReopened never retries it.
-    if (!symbol || !is_connection_opened) return null;
+    // Use a safe default symbol so SmartChart always renders and shows its loading UI.
+    // The real symbol will arrive from the workspace or active_symbols shortly after mount.
+    const active_symbol = symbol || DEFAULT_SYMBOL;
 
     return (
         <div
@@ -190,7 +219,7 @@ const Chart = observer(({ show_digits_stats }: { show_digits_stats: boolean }) =
                 requestForgetStream={requestForgetStream}
                 requestSubscribe={requestSubscribe}
                 settings={settings}
-                symbol={symbol}
+                symbol={active_symbol}
                 topWidgets={() => <ChartTitle onChange={onSymbolChange} />}
                 isConnectionOpened={is_connection_opened}
                 getMarketsOrder={getMarketsOrder}
