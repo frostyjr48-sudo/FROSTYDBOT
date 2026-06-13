@@ -1,33 +1,18 @@
 import { LocalStorageConstants, LocalStorageUtils, URLUtils } from '@deriv-com/utils';
-import { isStaging } from '../url/helpers';
 
 export const APP_IDS = {
-    LOCALHOST: 36300,
-    TMP_STAGING: 64584,
-    STAGING: 29934,
-    STAGING_BE: 29934,
-    STAGING_ME: 29934,
+    LOCALHOST: 84799,
     PRODUCTION: '33wSP7U3hjAPonrQEN2oF',
     PRODUCTION_LEGACY: 84799,
-    PRODUCTION_BE: 65556,
-    PRODUCTION_ME: 65557,
 };
 
 export const livechat_license_id = 12049137;
 export const livechat_client_id = '66aa088aad5a414484c1fd1fa8a5ace7';
 
 export const domain_app_ids = {
-    'master.bot-standalone.pages.dev': APP_IDS.TMP_STAGING,
-    'staging-dbot.deriv.com': APP_IDS.STAGING,
-    'staging-dbot.deriv.be': APP_IDS.STAGING_BE,
-    'staging-dbot.deriv.me': APP_IDS.STAGING_ME,
     'dbot.deriv.com': APP_IDS.PRODUCTION,
-    'dbot.deriv.be': APP_IDS.PRODUCTION_BE,
-    'dbot.deriv.me': APP_IDS.PRODUCTION_ME,
     'valentinetraders.site': APP_IDS.PRODUCTION,
     'www.valentinetraders.site': APP_IDS.PRODUCTION,
-    // Legacy app ID fallback — used when old users connect from unlisted domains
-    'legacy': APP_IDS.PRODUCTION_LEGACY,
 };
 
 export const getCurrentProductionDomain = () =>
@@ -90,8 +75,6 @@ export const getAppId = () => {
 
     if (config_app_id) {
         app_id = config_app_id;
-    } else if (isStaging()) {
-        app_id = APP_IDS.STAGING;
     } else if (isTestLink()) {
         app_id = APP_IDS.LOCALHOST;
     } else {
