@@ -1,1 +1,2 @@
 - [Bot Builder init order](bot-builder-init-order.md) — is_loading=true in app-content.jsx is required; gates BotBuilder render until dbot_store is set
+- [Chart API connection fix](chart-api-connection.md) — SmartChart must use api_base.api for all requests; chart_api.api is a separate unwaited WebSocket that hangs

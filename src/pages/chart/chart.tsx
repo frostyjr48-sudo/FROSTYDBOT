@@ -31,14 +31,14 @@ type TError = null | {
 
 const subscriptions: TSubscription = {};
 
-const getChartApi = () => chart_api?.api || api_base?.api;
+const getApi = () => api_base?.api;
 
 const Chart = observer(({ show_digits_stats }: { show_digits_stats: boolean }) => {
     const barriers: [] = [];
     const { common, ui } = useStore();
     const { chart_store, run_panel, dashboard } = useStore();
     const [isSafari, setIsSafari] = useState(false);
-    const [is_connection_opened, setIsConnectionOpened] = useState(false);
+    const [is_connection_opened, setIsConnectionOpened] = useState(!!api_base?.api);
 
     const {
         chart_type,
@@ -74,48 +74,34 @@ const Chart = observer(({ show_digits_stats }: { show_digits_stats: boolean }) =
         setIsSafari(isSafariBrowser());
 
         return () => {
-            chart_api?.api?.forgetAll('ticks');
+            try {
+                Object.keys(subscriptions).forEach(id => {
+                    const sub = subscriptions[id];
+                    if (sub && typeof (sub as any).unsubscribe === 'function') {
+                        (sub as any).unsubscribe();
+                    }
+                    delete subscriptions[id];
+                });
+                const api = getApi();
+                api?.forgetAll('ticks');
+            } catch {
+                // ignore cleanup errors
+            }
         };
     }, []);
 
     useEffect(() => {
-        const initChartConnection = async () => {
-            if (!chart_api.api) {
-                await chart_api.init();
-            }
-
-            const checkReady = () => {
-                const api = getChartApi();
-                if (!api) return false;
-                const readyState = api.connection?.readyState;
-                return readyState === WebSocket.OPEN || readyState === undefined;
-            };
-
-            if (checkReady()) {
-                setIsConnectionOpened(true);
-                return;
-            }
-
+        if (!api_base?.api) {
             const interval = setInterval(() => {
-                if (checkReady()) {
+                if (api_base?.api) {
                     setIsConnectionOpened(true);
                     clearInterval(interval);
                 }
-            }, 100);
-
-            const timeout = setTimeout(() => {
-                clearInterval(interval);
-                const api = getChartApi();
-                if (api) setIsConnectionOpened(true);
-            }, 5000);
-
-            return () => {
-                clearInterval(interval);
-                clearTimeout(timeout);
-            };
-        };
-
-        initChartConnection();
+            }, 200);
+            return () => clearInterval(interval);
+        } else {
+            setIsConnectionOpened(true);
+        }
     }, []);
 
     useEffect(() => {
@@ -134,34 +120,50 @@ const Chart = observer(({ show_digits_stats }: { show_digits_stats: boolean }) =
     }, [symbol]);
 
     const requestAPI = async (req: ServerTimeRequest | ActiveSymbolsRequest | TradingTimesRequest) => {
-        const api = getChartApi();
+        const api = getApi();
         if (!api) {
-            throw new Error('Chart API not initialized');
+            throw new Error('API not initialized');
         }
         return api.send(req);
     };
 
     const requestForgetStream = (subscription_id: string) => {
-        if (subscription_id) {
-            const api = getChartApi();
+        if (!subscription_id) return;
+        try {
+            const sub = subscriptions[subscription_id];
+            if (sub && typeof (sub as any).unsubscribe === 'function') {
+                (sub as any).unsubscribe();
+            }
+            delete subscriptions[subscription_id];
+            const api = getApi();
             api?.forget(subscription_id);
+        } catch {
+            // ignore
         }
     };
 
     const requestSubscribe = async (req: TicksStreamRequest, callback: (data: any) => void) => {
         try {
-            requestForgetStream(chartSubscriptionIdRef.current);
-            const api = getChartApi();
-            if (!api) throw new Error('Chart API not initialized');
+            const prev_id = chartSubscriptionIdRef.current;
+            if (prev_id) requestForgetStream(prev_id);
+
+            const api = getApi();
+            if (!api) throw new Error('API not initialized');
+
             const history = await api.send(req);
-            setChartSubscriptionId(history?.subscription.id);
+            const subscription_id = history?.subscription?.id;
+            setChartSubscriptionId(subscription_id);
             if (history) callback(history);
-            if (req.subscribe === 1) {
-                subscriptions[history?.subscription.id] = api
+
+            if (req.subscribe === 1 && subscription_id) {
+                const msg_subscription = api
                     .onMessage()
-                    ?.subscribe(({ data }: { data: TicksHistoryResponse }) => {
-                        callback(data);
+                    ?.subscribe(({ data }: { data: TicksHistoryResponse & { subscription?: { id: string } } }) => {
+                        if ((data as any)?.subscription?.id === subscription_id) {
+                            callback(data);
+                        }
                     });
+                subscriptions[subscription_id] = msg_subscription;
             }
         } catch (e) {
             // eslint-disable-next-line no-console
