@@ -34,7 +34,7 @@ import '../components/bot-notification/bot-notification.scss';
 
 const AppContent = observer(() => {
     const [is_api_initialized, setIsApiInitialized] = React.useState(false);
-    const [is_loading, setIsLoading] = React.useState(false);
+    const [is_loading, setIsLoading] = React.useState(true);
     const [is_eu_error_loading, setIsEuErrorLoading] = React.useState(true);
     const [offline_timeout, setOfflineTimeout] = React.useState(null);
     const store = useStore();
@@ -185,7 +185,6 @@ const AppContent = observer(() => {
         ServerTime.init(common);
         app.setDBotEngineStores();
         ApiHelpers.setInstance(app.api_helpers_store);
-        app.onMount();
         import('@/utils/gtm').then(({ default: GTM }) => {
             GTM.init(store);
         });
@@ -216,46 +215,38 @@ const AppContent = observer(() => {
                 });
         };
 
-        // Always show dashboard within 2.5s regardless of active symbols status
-        const dashboardBailout = setTimeout(() => {
-            setIsLoading(false);
-        }, 2500);
-
         if (ApiHelpers?.instance?.active_symbols) {
             retrieveActiveSymbols();
-            clearTimeout(dashboardBailout);
         } else {
             // This is a workaround to fix the issue where the active symbols are not loaded immediately
             // when the API is initialized. Should be replaced with RxJS pubsub
             const intervalId = setInterval(() => {
                 if (ApiHelpers?.instance?.active_symbols) {
                     clearInterval(intervalId);
-                    clearTimeout(dashboardBailout);
                     retrieveActiveSymbols();
                 } else if (!isOnline) {
                     // If offline, don't wait indefinitely
                     clearInterval(intervalId);
-                    clearTimeout(dashboardBailout);
                     console.log('[Offline] Stopping active symbols wait, showing dashboard');
                     setIsLoading(false);
                 }
-            }, 500);
+            }, 1000);
 
-            // Hard fallback at 3s
+            // Set a maximum timeout to prevent infinite loading
             setTimeout(() => {
                 clearInterval(intervalId);
-                clearTimeout(dashboardBailout);
                 if (is_loading) {
                     console.log('[Timeout] Active symbols loading timeout, showing dashboard');
                     setIsLoading(false);
                 }
-            }, 3000);
+            }, 10000);
         }
     };
 
     React.useEffect(() => {
         if (is_api_initialized) {
             init();
+            setIsLoading(true);
             if (!client.is_logged_in) {
                 changeActiveSymbolLoadingState();
             }

@@ -160,7 +160,6 @@ export default class AppStore {
         this.showDigitalOptionsMaltainvestError();
 
         if (!this.dbot_store) return;
-        if (window.Blockly?.derivWorkspace) return;
 
         let timer_counter = 1;
 

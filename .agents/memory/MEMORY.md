@@ -1,0 +1,1 @@
+- [Bot Builder init order](bot-builder-init-order.md) — is_loading=true in app-content.jsx is required; gates BotBuilder render until dbot_store is set
