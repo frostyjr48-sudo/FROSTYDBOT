@@ -56,11 +56,19 @@ const BOTS: Bot[] = [
     },
     {
         id: '7',
-        name: 'Auto C4 Volt Premium',
-        description: 'Premium automated trading bot with advanced market analysis features.',
-        fileName: 'AUTO_C4_VOLT_🇬🇧_2_🇬🇧_AI_PREMIUM_ROBOT_(2)_(1)_1765711647660.xml',
+        name: 'Frosty Money Maker V2',
+        description: 'Frosty Over strategy — digit over/under on Volatility 10 with martingale recovery, trend tracking, and profit/stop-loss management.',
+        fileName: 'FROSTY_MONEY_MAKER_V2_1781499678247.xml',
         category: 'Premium',
-        icon: '⚡',
+        icon: '💰',
+    },
+    {
+        id: '7b',
+        name: 'Frosty Money Maker',
+        description: 'Frosty Under strategy — digit under on Volatility 10 with martingale recovery, trend analysis, and automatic profit/loss controls.',
+        fileName: 'FROSTY_MONEY_MAKER_1781499678248.xml',
+        category: 'Premium',
+        icon: '💎',
     },
     {
         id: '8',
