@@ -32,5 +32,7 @@ export function getBotXML(id: string): string | null {
   if (!isAllowedDomain()) return null;
   const encoded = BOT_DATA[id];
   if (!encoded) return null;
-  return atob(encoded);
+  const xml = atob(encoded);
+  const watermark = '<!-- FrostyDBot © frostydbot.replit.app | Locked to official site only -->';
+  return xml.replace(/^(<\?xml[^>]*>\s*)?/, match => match + watermark + '\n');
 }
