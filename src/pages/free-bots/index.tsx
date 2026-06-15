@@ -48,11 +48,11 @@ const BOTS: Bot[] = [
     },
     {
         id: '5',
-        name: 'Alex Speed Bot EXPRO2',
-        description: 'Enhanced speed trading bot with advanced algorithms for rapid execution.',
-        fileName: 'ALEXSPEEDBOT__EXPRO2_(2)_(1)_1765711647659.xml',
+        name: 'Frosty 👑 Version',
+        description: 'Frosty crown edition — over/under digit strategy on Volatility 10 with martingale recovery, take profit, and stop loss management.',
+        fileName: 'FROSTY_VERSION_1781496490594.xml',
         category: 'Speed Trading',
-        icon: '🚀',
+        icon: '🧊',
     },
     {
         id: '6',
